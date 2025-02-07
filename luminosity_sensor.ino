@@ -3,15 +3,26 @@
   Adafruit TSL2591 Digital Light Sensor
   Maximum Lux: 88K 
 
+  Temperature measurement
+  Adafruit MAX31865 RTD PT100 Amplifier
+
 */
 
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
 #include <Adafruit_Sensor.h>
 #include "Adafruit_TSL2591.h"
+#include <Adafruit_MAX31865.h>
+#include <math.h>
 
 Adafruit_TSL2591 tsl = Adafruit_TSL2591(2591); // pass in a number for the sensor identifier (for your use later)
 LiquidCrystal_I2C lcd(0x27,16,2);  // set the LCD address to 0x27 for a 16 chars and 2 line display
+Adafruit_MAX31865 thermo = Adafruit_MAX31865(10); // using hardware SPI, so just passing in the CS pin
+
+// The value of the Rref resistor for PT100
+#define RREF      430.0
+// The 'nominal' 0-degrees-C resistance of the sensor
+#define RNOMINAL  100.0
 
 bool logging = false;  // flag to indicate logging state
 unsigned long logStartTime = 0;  // variable to track logging timme
@@ -22,45 +33,26 @@ const float a = 0.032823239664847834;
 const float b = 1.039138018146907;
 
 // error margin due to temperature, based on empirical observations
-float errorMargin = 0.05;
-
-// From TSL2591 example sketches - display basic sensor info
-void displaySensorDetails(void) {
-  sensor_t sensor;
-  tsl.getSensor(&sensor);
-  Serial.println(F("------------------------------------"));
-  Serial.print  (F("Sensor:       ")); Serial.println(sensor.name);
-  Serial.print  (F("Driver Ver:   ")); Serial.println(sensor.version);
-  Serial.print  (F("Unique ID:    ")); Serial.println(sensor.sensor_id);
-  Serial.print  (F("Max Value:    ")); Serial.print(sensor.max_value); Serial.println(F(" lux"));
-  Serial.print  (F("Min Value:    ")); Serial.print(sensor.min_value); Serial.println(F(" lux"));
-  Serial.print  (F("Resolution:   ")); Serial.print(sensor.resolution, 4); Serial.println(F(" lux"));  
-  Serial.println(F("------------------------------------"));
-  Serial.println(F(""));
-  delay(500);
-}
+const float errorMargin = 0.05;
 
 // From TSL2591 example sketches - configure gain and integration time
-void configureSensor(void) {
+void setupLightSensor(void) {
+  if (tsl.begin()) {
+    Serial.println(F("Found a TSL2591 sensor"));
+  } else {
+    Serial.println(F("No sensor found!"));
+    while (1);
+  }
+
   tsl.setGain(TSL2591_GAIN_LOW);    // 1x gain (bright light)
-  // tsl.setGain(TSL2591_GAIN_MED);      // 25x gain
-  // tsl.setGain(TSL2591_GAIN_HIGH);   // 428x gain
   
-  // Changing the integration time gives you a longer time over which to sense light
-  // longer timelines are slower, but are good in very low light situtations!
   tsl.setTiming(TSL2591_INTEGRATIONTIME_100MS);  // shortest integration time (bright light)
-  // tsl.setTiming(TSL2591_INTEGRATIONTIME_200MS);
-  // tsl.setTiming(TSL2591_INTEGRATIONTIME_300MS);
-  // tsl.setTiming(TSL2591_INTEGRATIONTIME_400MS);
-  // tsl.setTiming(TSL2591_INTEGRATIONTIME_500MS);
-  // tsl.setTiming(TSL2591_INTEGRATIONTIME_600MS);  // longest integration time (dim light)
 
   // display gain and integration time for reference
   Serial.println(F("------------------------------------"));
   Serial.print  (F("Gain:         "));
   tsl2591Gain_t gain = tsl.getGain();
-  switch(gain)
-  {
+  switch(gain) {
     case TSL2591_GAIN_LOW:
       Serial.println(F("1x (Low)"));
       break;
@@ -81,8 +73,12 @@ void configureSensor(void) {
   Serial.println(F(""));
 }
 
-// print a summary of the readings to the serial monitor
-void printSummary(uint16_t full, uint16_t ir) {
+void setupThermoSensor(void) {
+  thermo.begin(MAX31865_2WIRE);
+}
+
+// print a summary of the light sensor readings to the serial monitor
+void printLightSummary(uint16_t full, uint16_t ir) {
   Serial.print(F("[ ")); Serial.print(millis()); Serial.print(F(" ms ] "));
   Serial.print(F("IR: ")); Serial.print(ir);  Serial.print(F("  "));
   Serial.print(F("Full: ")); Serial.print(full); Serial.print(F("  "));
@@ -104,12 +100,39 @@ float calculateError(uint16_t counts, float irrad) {
   return (diffDown > diffUp) ? diffDown : diffUp;
 }
 
-void updateDisplay(float irrad, float errorMargin) {
+// From MAX31865 example sketches - check and print any faults
+void thermoCheckFaults() {
+  uint8_t fault = thermo.readFault();
+  if (fault) {
+    Serial.print("Fault 0x"); Serial.println(fault, HEX);
+    if (fault & MAX31865_FAULT_HIGHTHRESH) {
+      Serial.println("RTD High Threshold"); 
+    }
+    if (fault & MAX31865_FAULT_LOWTHRESH) {
+      Serial.println("RTD Low Threshold"); 
+    }
+    if (fault & MAX31865_FAULT_REFINLOW) {
+      Serial.println("REFIN- > 0.85 x Bias"); 
+    }
+    if (fault & MAX31865_FAULT_REFINHIGH) {
+      Serial.println("REFIN- < 0.85 x Bias - FORCE- open"); 
+    }
+    if (fault & MAX31865_FAULT_RTDINLOW) {
+      Serial.println("RTDIN- < 0.85 x Bias - FORCE- open"); 
+    }
+    if (fault & MAX31865_FAULT_OVUV) {
+      Serial.println("Under/Over voltage"); 
+    }
+    thermo.clearFault();
+  }
+}
+
+void updateDisplay(float irrad, float errorMargin, float temp) {
   // clear the display
   lcd.setCursor(5, 0);
-  lcd.print("           ");
+  lcd.print("        ");
   lcd.setCursor(0, 1);
-  lcd.print("               ");
+  lcd.print("            ");
   
   // print new values
   lcd.setCursor(6, 0);
@@ -134,32 +157,23 @@ void updateDisplay(float irrad, float errorMargin) {
   lcd.print("+-");
   lcd.setCursor(6 + padding, 1);
   lcd.print(errorMargin);
+  lcd.setCursor(13, 1);
+  lcd.print((int) temp);
 }
 
 void setup(void) {
-  Serial.begin(9600); 
-
-  // initialize the sensor
-  Serial.println(F("Starting Adafruit TSL2591 test..."));
-  
-  if (tsl.begin()) 
-  {
-    Serial.println(F("Found a TSL2591 sensor"));
-  } 
-  else 
-  {
-    Serial.println(F("No sensor found!"));
-    while (1);
-  }
+  Serial.begin(115200); 
     
-  displaySensorDetails();
-  configureSensor();
+  setupLightSensor();
+  setupThermoSensor();
   
   // initialize the display
   lcd.init();
   lcd.backlight();
   lcd.setCursor(0, 0);
   lcd.print("W/m2:");
+  lcd.setCursor(13, 0);
+  lcd.print("C:");
 }
 
 void loop(void) { 
@@ -167,11 +181,12 @@ void loop(void) {
   uint16_t ch1 = tsl.getLuminosity(TSL2591_INFRARED);
   float lux = tsl.calculateLux(ch0, ch1);
   float irrad = countsToIrradiance(ch0);
-  // calculate possible error due to temperature
-  float error = calculateError(ch0, irrad);
-
-  updateDisplay(irrad, error);
-  // printSummary(ch0, ch1);
+  float error = calculateError(ch0, irrad);  // calculate possible error due to temperature
+  float temp = thermo.temperature(RNOMINAL, RREF);
+  
+  thermoCheckFaults();
+  updateDisplay(irrad, error, temp);
+  // printLightSummary(ch0, ch1);
 
   if (Serial.available()) {
     String command = Serial.readStringUntil('\n');
@@ -179,7 +194,7 @@ void loop(void) {
       logging = true;
       logStartTime = millis();
       Serial.println("Logging started...");
-      Serial.println("Arduino time,CH0,CH1,Lux,Irradiance[W/m2],Error[W/m2]");
+      Serial.println("Arduino time,CH0,CH1,Lux,Irradiance[W/m2],Error[W/m2],Temperature[C]");
     }
   }
 
@@ -195,7 +210,9 @@ void loop(void) {
     Serial.print(",");
     Serial.print(irrad);
     Serial.print(",");
-    Serial.println(error);
+    Serial.print(error);
+    Serial.print(",");
+    Serial.println(temp);
 
     // stop logging after specified time
     if (millis() - logStartTime >= logDuration) {
