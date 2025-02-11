@@ -8,12 +8,11 @@
 
 */
 
-#include <Wire.h>
-#include <LiquidCrystal_I2C.h>
-#include <Adafruit_Sensor.h>
-#include "Adafruit_TSL2591.h"
 #include <Adafruit_MAX31865.h>
-#include <math.h>
+#include <Adafruit_Sensor.h>
+#include <Adafruit_TSL2591.h>
+#include <LiquidCrystal_I2C.h>
+#include <Wire.h>
 
 Adafruit_TSL2591 tsl = Adafruit_TSL2591(2591); // pass in a number for the sensor identifier (for your use later)
 LiquidCrystal_I2C lcd(0x27,16,2);  // set the LCD address to 0x27 for a 16 chars and 2 line display
@@ -132,38 +131,55 @@ void updateDisplay(float irrad, float errorMargin, float temp) {
   lcd.setCursor(5, 0);
   lcd.print("        ");
   lcd.setCursor(0, 1);
-  lcd.print("            ");
-  
-  // print new values
-  lcd.setCursor(6, 0);
-  lcd.print(irrad);
+  lcd.print("             ");
 
-  int padding;  
-  if (irrad >= 2500) {
-    padding = 1;
-  } else if (irrad >= 1000) {
-    padding = 2;
-  } else if (irrad >= 250) {
-    padding = 1;
+  // round the irradiance to one decimal place and pad with spaces
+  char irradRound[5];
+  dtostrf(irrad, 1, 1, irradRound);
+  char irradFormat[6];
+  snprintf(irradFormat, 6, "%-6s", irradRound);
+  lcd.setCursor(6, 0);
+  lcd.print(irradFormat);
+
+  lcd.setCursor(3, 1);
+  lcd.print("+-");
+  
+  // choose correct field width to align the numbers
+  int minWidth;  
+  if (irrad >= 1000) {
+    minWidth = 6;
   } else if (irrad >= 100) {
-    padding = 2;
+    minWidth = 5;
   } else if (irrad >= 10) {
-    padding = 1;
+    minWidth = 4;
   } else {
-    padding = 0;
+    minWidth = 3;
   }
 
-  lcd.setCursor(3 + padding, 1);
-  lcd.print("+-");
-  lcd.setCursor(6 + padding, 1);
-  lcd.print(errorMargin);
+  // create a string that will define formatting of the error number based on the above field width
+  char formatString[10];
+  snprintf(formatString, 10, "%%%ds", minWidth);
+  
+  // round the error margin to one decimal place and pad with spaces
+  char errorRound[5];
+  dtostrf(errorMargin, 1, 1, errorRound);
+  char errorFormat[6];
+  snprintf(errorFormat, 6, formatString, errorRound);
+  lcd.setCursor(6, 1);
+  lcd.print(errorFormat);
+  
+  // round and pad the temperature
+  // note: the temperature is rounded to one decimal place, but with current screen space constraints it is printed as integer
+  char tempRound[5];
+  dtostrf(temp, 1, 1, tempRound);
+  char tempFormat[4];
+  snprintf(tempFormat, 3, "%-3s", tempRound);
   lcd.setCursor(13, 1);
-  lcd.print((int) temp);
+  lcd.print(tempFormat);
 }
 
 void setup(void) {
-  Serial.begin(115200); 
-    
+  Serial.begin(115200);  
   setupLightSensor();
   setupThermoSensor();
   
