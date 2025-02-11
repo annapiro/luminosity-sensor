@@ -76,15 +76,6 @@ void setupThermoSensor(void) {
   thermo.begin(MAX31865_2WIRE);
 }
 
-// print a summary of the light sensor readings to the serial monitor
-void printLightSummary(uint16_t full, uint16_t ir) {
-  Serial.print(F("[ ")); Serial.print(millis()); Serial.print(F(" ms ] "));
-  Serial.print(F("IR: ")); Serial.print(ir);  Serial.print(F("  "));
-  Serial.print(F("Full: ")); Serial.print(full); Serial.print(F("  "));
-  Serial.print(F("Visible: ")); Serial.print(full - ir); Serial.print(F("  "));
-  Serial.print(F("Lux: ")); Serial.println(tsl.calculateLux(full, ir), 6);
-}
-
 // convert CH0 raw counts to irradiance (W/m2)
 float countsToIrradiance(uint16_t counts) {
   return a * pow(counts, b);
@@ -134,10 +125,10 @@ void updateDisplay(float irrad, float errorMargin, float temp) {
   lcd.print("             ");
 
   // round the irradiance to one decimal place and pad with spaces
-  char irradRound[5];
+  char irradRound[8];
   dtostrf(irrad, 1, 1, irradRound);
-  char irradFormat[6];
-  snprintf(irradFormat, 6, "%-6s", irradRound);
+  char irradFormat[8];
+  snprintf(irradFormat, 7, "%-6s", irradRound);
   lcd.setCursor(6, 0);
   lcd.print(irradFormat);
 
@@ -146,7 +137,9 @@ void updateDisplay(float irrad, float errorMargin, float temp) {
   
   // choose correct field width to align the numbers
   int minWidth;  
-  if (irrad >= 1000) {
+  if (irrad > 9999) {
+    minWidth = 7;
+  } else if (irrad >= 1000) {
     minWidth = 6;
   } else if (irrad >= 100) {
     minWidth = 5;
@@ -157,14 +150,14 @@ void updateDisplay(float irrad, float errorMargin, float temp) {
   }
 
   // create a string that will define formatting of the error number based on the above field width
-  char formatString[10];
-  snprintf(formatString, 10, "%%%ds", minWidth);
+  char formatString[5];
+  snprintf(formatString, 5, "%%%ds", minWidth);
   
   // round the error margin to one decimal place and pad with spaces
-  char errorRound[5];
+  char errorRound[8];
   dtostrf(errorMargin, 1, 1, errorRound);
-  char errorFormat[6];
-  snprintf(errorFormat, 6, formatString, errorRound);
+  char errorFormat[8];
+  snprintf(errorFormat, 7, formatString, errorRound);
   lcd.setCursor(6, 1);
   lcd.print(errorFormat);
   
@@ -172,7 +165,7 @@ void updateDisplay(float irrad, float errorMargin, float temp) {
   // note: the temperature is rounded to one decimal place, but with current screen space constraints it is printed as integer
   char tempRound[5];
   dtostrf(temp, 1, 1, tempRound);
-  char tempFormat[4];
+  char tempFormat[5];
   snprintf(tempFormat, 3, "%-3s", tempRound);
   lcd.setCursor(13, 1);
   lcd.print(tempFormat);
@@ -202,7 +195,6 @@ void loop(void) {
   
   thermoCheckFaults();
   updateDisplay(irrad, error, temp);
-  // printLightSummary(ch0, ch1);
 
   if (Serial.available()) {
     String command = Serial.readStringUntil('\n');
