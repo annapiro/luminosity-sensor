@@ -25,11 +25,11 @@ Adafruit_MAX31865 thermo = Adafruit_MAX31865(10); // using hardware SPI, so just
 
 bool logging = false;  // flag to indicate logging state
 unsigned long logStartTime = 0;  // variable to track logging timme
-const long logDuration = 20000;  // logging duration in milliseconds
+const long logDuration = 10000;  // logging duration in milliseconds
 
 // fitted coefficients for converting raw counts to irradiance
-const float a = 0.032823239664847834;
-const float b = 1.039138018146907;
+const float a = 0.04560855009496846;
+const float b = 1.0538497422122406;
 
 // error margin due to temperature, based on empirical observations
 const float errorMargin = 0.05;
