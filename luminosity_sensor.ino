@@ -24,15 +24,18 @@ Adafruit_MAX31865 thermo = Adafruit_MAX31865(10); // using hardware SPI, so just
 #define RNOMINAL  100.0
 
 bool logging = false;  // flag to indicate logging state
-unsigned long logStartTime = 0;  // variable to track logging timme
-const long logDuration = 10000;  // logging duration in milliseconds
+unsigned long logStartTime = 0;  // logging start time tracker
+const long LOG_DURATION = 10000;  // logging duration in milliseconds
 
 // fitted coefficients for converting raw counts to irradiance
-const float a = 0.04560855009496846;
-const float b = 1.0538497422122406;
+const float A = 0.04560855009496846;
+const float B = 1.0538497422122406;
 
 // error margin due to temperature, based on empirical observations
-const float errorMargin = 0.05;
+const float ERROR_MARGIN = 0.05;
+
+// minimum CH0 value that the sensor was calibrated with
+const uint16_t CALIBRATION_THRESHOLD = 1500;
 
 // From TSL2591 example sketches - configure gain and integration time
 void setupLightSensor(void) {
@@ -78,11 +81,11 @@ void setupThermoSensor(void) {
 
 // convert CH0 raw counts to irradiance (W/m2)
 float countsToIrradiance(uint16_t counts) {
-  return a * pow(counts, b);
+  return A * pow(counts, B);
 }
 
 float calculateError(uint16_t counts, float irrad) {
-  float countsError = counts * errorMargin;
+  float countsError = counts * ERROR_MARGIN;
   float lowerBound = countsToIrradiance(counts - countsError);
   float upperBound = countsToIrradiance(counts + countsError);
   float diffDown = irrad - lowerBound;
@@ -149,17 +152,21 @@ void updateDisplay(float irrad, float errorMargin, float temp) {
     minWidth = 3;
   }
 
-  // create a string that will define formatting of the error number based on the above field width
-  char formatString[5];
-  snprintf(formatString, 5, "%%%ds", minWidth);
-  
-  // round the error margin to one decimal place and pad with spaces
-  char errorRound[8];
-  dtostrf(errorMargin, 1, 1, errorRound);
-  char errorFormat[8];
-  snprintf(errorFormat, 7, formatString, errorRound);
-  lcd.setCursor(6, 1);
-  lcd.print(errorFormat);
+  if (errorMargin == -1) {
+    lcd.print(" ???");
+  } else {
+    // create a string that will define formatting of the error number based on the above field width
+    char formatString[5];
+    snprintf(formatString, 5, "%%%ds", minWidth);
+    
+    // round the error margin to one decimal place and pad with spaces
+    char errorRound[8];
+    dtostrf(errorMargin, 1, 1, errorRound);
+    char errorFormat[8];
+    snprintf(errorFormat, 7, formatString, errorRound);
+    lcd.setCursor(6, 1);
+    lcd.print(errorFormat);
+  }
   
   // round and pad the temperature
   // note: the temperature is rounded to one decimal place, but with current screen space constraints it is printed as integer
@@ -190,40 +197,35 @@ void loop(void) {
   uint16_t ch1 = tsl.getLuminosity(TSL2591_INFRARED);
   float lux = tsl.calculateLux(ch0, ch1);
   float irrad = countsToIrradiance(ch0);
-  float error = calculateError(ch0, irrad);  // calculate possible error due to temperature
+  // calculate possible error due to temperature
+  float error = calculateError(ch0, irrad); 
   float temp = thermo.temperature(RNOMINAL, RREF);
-  
+
   thermoCheckFaults();
-  updateDisplay(irrad, error, temp);
+  // only display the error if the measurement exceeds the threshold as the sensor wasn't calibrated in low-light conditions
+  updateDisplay(irrad, ch0 >= CALIBRATION_THRESHOLD ? error : -1, temp);
 
   if (Serial.available()) {
     String command = Serial.readStringUntil('\n');
     if (command.equalsIgnoreCase("log")) {
       logging = true;
       logStartTime = millis();
-      Serial.println("Logging started...");
-      Serial.println("Arduino time,CH0,CH1,Lux,Irradiance[W/m2],Error[W/m2],Temperature[C]");
+      Serial.println("ArduinoTime,CH0,CH1,Lux,Irradiance[W/m2],Error[W/m2],Temperature[C]");
     }
   }
 
+  // print data in CSV format
   if (logging) {
-    // print data in CSV format
-    Serial.print(millis()); // timestamp
-    Serial.print(",");
-    Serial.print(ch0); // channel 0 - full spectrum
-    Serial.print(",");
-    Serial.print(ch1); // channel 1 - IR
-    Serial.print(",");
-    Serial.print(lux);
-    Serial.print(",");
-    Serial.print(irrad);
-    Serial.print(",");
-    Serial.print(error);
-    Serial.print(",");
+    Serial.print(millis()); Serial.print(","); // timestamp
+    Serial.print(ch0); Serial.print(","); // channel 0 (full spectrum)
+    Serial.print(ch1); Serial.print(","); // channel 1 (IR)
+    Serial.print(lux); Serial.print(",");
+    Serial.print(irrad); Serial.print(",");
+    Serial.print(error); Serial.print(",");
     Serial.println(temp);
 
     // stop logging after specified time
-    if (millis() - logStartTime >= logDuration) {
+    if (millis() - logStartTime >= LOG_DURATION) {
       logging = false;
       Serial.println("Logging stopped.");
       Serial.println();
