@@ -28,8 +28,8 @@ unsigned long logStartTime = 0;  // logging start time tracker
 const long LOG_DURATION = 10000;  // logging duration in milliseconds
 
 // fitted coefficients for converting raw counts to irradiance
-const float A = 0.04560855009496846;
-const float B = 1.0538497422122406;
+const float A = 0.061738558933375494;
+const float B = 1.0090599721812605;
 
 // error margin due to temperature, based on empirical observations
 const float ERROR_MARGIN = 0.05;
