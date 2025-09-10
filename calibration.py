@@ -16,6 +16,7 @@ df_am0 = pd.read_csv('data/AM0_grouped.csv')
 df_am15g = pd.read_csv('data/AM15G_grouped.csv')
 
 # construct a dictionary with reference irradiance values for different spectra
+# spectrum source https://www2.pvlighthouse.com.au/resources/optics/spectrum%20library/spectrum%20library.aspx
 spectrum_reference = dict()
 with open('data/spectrum_reference.csv', 'r') as csvfile:
     reader = csv.reader(csvfile)
@@ -38,7 +39,8 @@ xy_data_am15g = pd.DataFrame({
 })
 
 # combine the measurements from both spectra into a single training dataset
-xy_data = pd.concat([xy_data_am0, xy_data_am15g], ignore_index=True)
+# xy_data = pd.concat([xy_data_am0, xy_data_am15g], ignore_index=True)
+xy_data = xy_data_am15g.copy()
 xy_data.sort_values('Counts', inplace=True, ignore_index=True)
 
 X = xy_data['Counts']
@@ -59,7 +61,7 @@ plt.xlabel('Raw counts')
 plt.ylabel('Irradiance [W/m²]')
 plt.title('Fitting results (y = axᵇ)')
 plt.legend()
-plt.savefig('fitted_results.png', dpi=150)
+plt.savefig('fitted_results_am15g.png', dpi=150)
 plt.close()
 
 # calculate residuals
@@ -70,7 +72,7 @@ plt.axhline(0, color='red', linestyle='--')
 plt.xlabel('Raw counts')
 plt.ylabel('Residuals')
 plt.title(f"Residuals of fitted curve (mean error: {mae:.2f})")
-plt.savefig('residuals.png', dpi=150)
+plt.savefig('residuals_am15g.png', dpi=150)
 plt.close()
 
 ss_res = np.sum(residuals**2)  # sum of squares of residuals
