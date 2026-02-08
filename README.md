@@ -28,7 +28,9 @@ The casing was designed and 3D-printed by Stefan Weingand.
 ![Display example](./img/display.png)
 
 1 - Irradiance [W/m²]
+
 2 - Estimated error range [W/m²]. If the irradiance is below a certain threshold (about 10% AM1.5G), the error cannot be reliably estimated and will show “???”.
+
 3 - Temperature [C]
 
 ## Serial monitor control
