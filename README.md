@@ -1,7 +1,7 @@
 # TSL2591 Arduino Software with Irradiance Calibration
 [![Latest release](https://badgen.net/github/release/annapiro/luminosity-sensor)](https://github.com/annapiro/luminosity-sensor/releases)
-[![GitHub license](https://badgen.net/github/license/annapiro/luminosity-sensor)](https://github.com/annapiro/luminosity-sensor/blob/main/LICENSE)
-[![GitHub latest commit](https://badgen.net/github/last-commit/annapiro/luminosity-sensor)](https://GitHub.com/annapiro/luminosity-sensor/commit/)
+[![GitHub license](https://img.shields.io/github/license/annapiro/luminosity-sensor.svg)](https://github.com/annapiro/luminosity-sensor/blob/main/LICENSE)
+[![Arduino build check](https://github.com/annapiro/luminosity-sensor/actions/workflows/arduino_build.yml/badge.svg)](https://github.com/annapiro/luminosity-sensor/actions/workflows/arduino_build.yml)
 
 ## Hardware
 ### Main components

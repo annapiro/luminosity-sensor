@@ -1,0 +1,22 @@
+name: Arduino build check
+
+on: push
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v2
+
+      - uses: arduino/compile-sketches@v1
+        with:
+          fqbn: "arduino:avr:leonardo"
+          libraries: |
+            - name: Adafruit MAX31865 library
+            - name: Adafruit Unified Sensor
+            - name: Adafruit TSL2591 Library
+            - name: LiquidCrystal I2C
+          sketch-paths: |
+            - .
