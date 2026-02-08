@@ -14,7 +14,7 @@ A neutral density filter foil is incorporated to prevent sensor oversaturation a
 Filter reflectivity data (measured with PerkinElmer Spectrometer) is available in [`data/filter_reflectivity.csv`](./data/filter_reflectivity.csv).
 
 ### Outer casing
-<img src="https://github.com/annapiro/luminosity-sensor/blob/main/img/casing.png?raw=true" alt="Outer casing" style="height: 50%;>
+![Outer casing](./img/casing.png)
 
 The casing was designed and 3D-printed by Stefan Weingand. 
 
