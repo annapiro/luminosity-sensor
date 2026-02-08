@@ -1,0 +1,23 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: TSL2591 Arduino Software with Irradiance Calibration
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
+authors:
+  - given-names: Anna
+    family-names: Piroženoka
+    affiliation: University of Stuttgart
+    orcid: 'https://orcid.org/0009-0006-9339-6084'
+repository-code: 'https://github.com/annapiro/luminosity-sensor'
+abstract: >-
+  Arduino software for the TSL2591 light sensor with
+  temperature monitoring and empirical irradiance
+  calibration.
+license: MIT
+commit: ee45202019fceeea358e46a917d1649bcc130075
+version: 1.1.0
+date-released: '2026-01-08'
