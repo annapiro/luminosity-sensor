@@ -24,7 +24,10 @@ Adafruit_MAX31865 thermo = Adafruit_MAX31865(10); // using hardware SPI, so just
 #define RNOMINAL  100.0
 
 bool logging = false;  // flag to indicate logging state
+bool continuousMode = false;
+unsigned long logInterval = 60000;  // interval between measurements in milliseconds
 unsigned long logStartTime = 0;  // logging start time tracker
+unsigned long lastLog = 0;
 const long LOG_DURATION = 10000;  // logging duration in milliseconds
 
 // fitted coefficients for converting raw counts to irradiance
@@ -207,11 +210,37 @@ void loop(void) {
 
   if (Serial.available()) {
     String command = Serial.readStringUntil('\n');
-    if (command.equalsIgnoreCase("log")) {
-      logging = true;
-      logStartTime = millis();
-      Serial.println("ArduinoTime,CH0,CH1,Lux,Irradiance[W/m2],Error[W/m2],Temperature[C]");
+    command.trim();
+    if (command.startsWith("log")) {
+      int separatorPos = command.indexOf(' ');
+
+      if (separatorPos == -1) {
+        logging = true;
+        logStartTime = millis();
+        Serial.println("ArduinoTime,CH0,CH1,Lux,Irradiance[W/m2],Error[W/m2],Temperature[C]");
+      } else {
+        // extract the measurement interval from the command
+        int seconds = command.substring(separatorPos + 1).toInt();
+        if (seconds > 0) {
+          Serial.print("Start continuous logging every ");
+          Serial.print(seconds);
+          Serial.println(" s");
+          continuousMode = true;
+          logInterval = seconds * 1000;
+          Serial.println("\nArduinoTime,CH0,CH1,Lux,Irradiance[W/m2],Error[W/m2],Temperature[C]");
+        } else {
+          Serial.println("Command not recognized!");
+        }
+      }
     }
+
+    if (command.equalsIgnoreCase("stop")) {
+      logging = false;
+      continuousMode = false;
+      Serial.println("Logging stopped.");
+      Serial.println();
+    }
+      
   }
 
   // print data in CSV format
@@ -230,6 +259,18 @@ void loop(void) {
       Serial.println("Logging stopped.");
       Serial.println();
     }
+  }
+
+  if (continuousMode && (millis() - lastLog) >= logInterval) {
+    Serial.print(millis()); Serial.print(","); // timestamp
+    Serial.print(ch0); Serial.print(","); // channel 0 (full spectrum)
+    Serial.print(ch1); Serial.print(","); // channel 1 (IR)
+    Serial.print(lux); Serial.print(",");
+    Serial.print(irrad); Serial.print(",");
+    Serial.print(error); Serial.print(",");
+    Serial.println(temp);
+
+    lastLog = millis();
   }
 
   delay(500);
