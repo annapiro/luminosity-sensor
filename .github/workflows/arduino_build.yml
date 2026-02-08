@@ -19,4 +19,4 @@ jobs:
             - name: Adafruit TSL2591 Library
             - name: LiquidCrystal I2C
           sketch-paths: |
-            - .
+            - luminosity_sensor

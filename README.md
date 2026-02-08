@@ -23,7 +23,7 @@ Filter reflectivity data (measured with PerkinElmer Spectrometer) is available i
 The casing was designed and 3D-printed by Stefan Weingand. 
 
 ## Files
-- `luminosity_sensor.ino` - main software for Arduino
+- `luminosity_sensor/luminosity_sensor.ino` - main software for Arduino
 - `requirements.txt` - packages you need to install for running **Python scripts** (ignore if you're only using the Arduino sketch)
 - `calibration.py` - script that was used to calculate the coefficients for converting counts to irradiance
 - `helpers` - Python scripts that were used for preprocessing calibration data (conversion from serial output to csv and aggregation from csv)
