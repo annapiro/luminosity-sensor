@@ -1,9 +1,10 @@
 # TSL2591 Arduino Software with Irradiance Calibration
 [![Latest release](https://badgen.net/github/release/annapiro/luminosity-sensor)](https://github.com/annapiro/luminosity-sensor/releases)
 [![GitHub license](https://badgen.net/github/license/annapiro/luminosity-sensor)](https://github.com/annapiro/luminosity-sensor/blob/main/LICENSE)
+[![GitHub latest commit](https://badgen.net/github/last-commit/annapiro/luminosity-sensor)](https://GitHub.com/annapiro/luminosity-sensor/commit/)
 
 ## Hardware
-### External devices
+### Main components
 - Arduino Pro Micro
 - Adafruit TSL2591 Digital Light Sensor
 - Adafruit MAX31865 RTD PT100 Amplifier
