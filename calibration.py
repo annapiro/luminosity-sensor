@@ -12,8 +12,7 @@ def model_function(x, a, b):
     return a * (x ** b)
 
 
-df_am0 = pd.read_csv('data/AM0_grouped.csv')
-df_am15g = pd.read_csv('data/AM15G_grouped.csv')
+df_am15g = pd.read_csv('data/AM15G_data.csv')
 
 # construct a dictionary with reference irradiance values for different spectra
 # spectrum source https://www2.pvlighthouse.com.au/resources/optics/spectrum%20library/spectrum%20library.aspx
@@ -28,18 +27,12 @@ with open('data/spectrum_reference.csv', 'r') as csvfile:
         spectrum_reference[spectrum][int(intensity)] = float(irradiance)
 
 # correlate the sensor's raw counts with target irradiance values
-xy_data_am0 = pd.DataFrame({
-    'Counts': df_am0['CH0'],
-    'Irradiance': df_am0['Intensity'].apply(lambda x: spectrum_reference['AM0'].get(x))
-})
-
 xy_data_am15g = pd.DataFrame({
     'Counts': df_am15g['CH0'],
     'Irradiance': df_am15g['Intensity'].apply(lambda x: spectrum_reference['AM1.5G'].get(x))
 })
 
 # combine the measurements from both spectra into a single training dataset
-# xy_data = pd.concat([xy_data_am0, xy_data_am15g], ignore_index=True)
 xy_data = xy_data_am15g.copy()
 xy_data.sort_values('Counts', inplace=True, ignore_index=True)
 
