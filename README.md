@@ -1,7 +1,7 @@
-# TSL2591 Arduino Software with Irradiance Calibration
+# TSL2591 Arduino Software and Irradiance Calibration
+[![Arduino build check](https://github.com/annapiro/luminosity-sensor/actions/workflows/arduino_build.yml/badge.svg)](https://github.com/annapiro/luminosity-sensor/actions/workflows/arduino_build.yml)
 [![Latest release](https://badgen.net/github/release/annapiro/luminosity-sensor)](https://github.com/annapiro/luminosity-sensor/releases)
 [![GitHub license](https://img.shields.io/github/license/annapiro/luminosity-sensor.svg)](https://github.com/annapiro/luminosity-sensor/blob/main/LICENSE)
-[![Arduino build check](https://github.com/annapiro/luminosity-sensor/actions/workflows/arduino_build.yml/badge.svg)](https://github.com/annapiro/luminosity-sensor/actions/workflows/arduino_build.yml)
 
 ## Hardware
 ### Main components
@@ -39,8 +39,11 @@ The casing was designed and 3D-printed by Stefan Weingand.
 
 ## Serial monitor control
 The device outputs readings to the serial monitor and accepts the following commands:
-- `log` - print measurements for 10 seconds, then stop
-- `log <sec>` - continuously print measurements every <sec> seconds
+- `every <sec>` - print a measurement every `<sec>` seconds
+- `timeout <sec>` - print measurements for `<sec>` seconds total, then stop
+- `log` - print a single measurement
+- `stop` - stop outputting measurements
+- `help` or `h` - show available commands
 
 ## Counts to irradiance conversion
 The TSL2591 sensor's raw counts are converted to irradiance (W/m²) using a power law relationship[^1]:

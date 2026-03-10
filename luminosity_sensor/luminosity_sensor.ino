@@ -24,11 +24,11 @@ Adafruit_MAX31865 thermo = Adafruit_MAX31865(10); // using hardware SPI, so just
 #define RNOMINAL  100.0
 
 bool logging = false;  // flag to indicate logging state
-bool continuousMode = false;
-unsigned long logInterval = 60000;  // interval between measurements in milliseconds
-unsigned long logStartTime = 0;  // logging start time tracker
-unsigned long lastLog = 0;
-const long LOG_DURATION = 10000;  // logging duration in milliseconds
+bool hasHeader = false;  // tracks whether the data already has a header
+uint32_t logInterval = 10000;  // interval between measurements in milliseconds
+uint32_t lastLog = 0;  // when was the latest log done
+uint32_t logTimeout = 0;  // timeout for running continuous measurements
+uint32_t logStartTime = 0;  // logging start time tracker
 
 // fitted coefficients for converting raw counts to irradiance
 const float A = 0.061738558933375494;
@@ -142,7 +142,7 @@ void updateDisplay(float irrad, float errorMargin, float temp) {
   lcd.print("+-");
   
   // choose correct field width to align the numbers
-  int minWidth;  
+  uint8_t minWidth;  
   if (irrad > 9999) {
     minWidth = 7;
   } else if (irrad >= 1000) {
@@ -181,7 +181,54 @@ void updateDisplay(float irrad, float errorMargin, float temp) {
   lcd.print(tempFormat);
 }
 
-void setup(void) {
+void printMeasurement(uint16_t ch0, uint16_t ch1, float lux, float irrad, float error, float temp) {
+  if (!hasHeader) {
+    Serial.println("\nArduinoTime,CH0,CH1,Lux,Irradiance[W/m2],Error[W/m2],Temperature[C]");
+    hasHeader = true;
+  }
+
+  Serial.print(millis()); Serial.print(","); // timestamp
+  Serial.print(ch0); Serial.print(","); // channel 0 (full spectrum)
+  Serial.print(ch1); Serial.print(","); // channel 1 (IR)
+  Serial.print(lux); Serial.print(",");
+  Serial.print(irrad); Serial.print(",");
+  Serial.print(error); Serial.print(",");
+  Serial.println(temp);
+
+  lastLog = millis();
+}
+
+void printSettings() {
+  Serial.print("Interval: ");
+  Serial.print(logInterval / 1000);
+  Serial.print("s | ");
+  if (logTimeout > 0) {
+    Serial.print("Timeout: ");
+    Serial.print(logTimeout / 1000);
+    Serial.print("s | ");
+    uint32_t elapsed = millis() - logStartTime;
+    uint32_t remaining = (elapsed < logTimeout) ? (logTimeout - elapsed) / 1000 : 0;
+    Serial.print("Remaining: ");
+    Serial.print(remaining);
+    Serial.println("s");
+  }
+  else {
+    Serial.println("No timeout");
+  }
+  hasHeader = false;
+}
+
+void printHelp() {
+  Serial.println("Available commands:");
+  Serial.println("  log           → Take single measurement now");
+  Serial.println("  every <sec>   → Measure every <sec> seconds (default: 10s)");
+  Serial.println("  timeout <sec> → Run measurements for <sec> seconds total (default: 0 - no timeout)");
+  Serial.println("  stop          → Stop all measurements");
+  Serial.println("  help or h     → Show this help");
+  hasHeader = false;
+}
+
+void setup() {
   Serial.begin(115200);  
   setupLightSensor();
   setupThermoSensor();
@@ -193,9 +240,11 @@ void setup(void) {
   lcd.print("W/m2:");
   lcd.setCursor(13, 0);
   lcd.print("C:");
+
+  printHelp();
 }
 
-void loop(void) { 
+void loop() { 
   uint16_t ch0 = tsl.getLuminosity(TSL2591_FULLSPECTRUM);
   uint16_t ch1 = tsl.getLuminosity(TSL2591_INFRARED);
   float lux = tsl.calculateLux(ch0, ch1);
@@ -208,70 +257,71 @@ void loop(void) {
   // only display the error if the measurement exceeds the threshold as the sensor wasn't calibrated in low-light conditions
   updateDisplay(irrad, ch0 >= CALIBRATION_THRESHOLD ? error : -1, temp);
 
+  // command parsing
   if (Serial.available()) {
     String command = Serial.readStringUntil('\n');
     command.trim();
-    if (command.startsWith("log")) {
-      int separatorPos = command.indexOf(' ');
 
-      if (separatorPos == -1) {
-        logging = true;
-        logStartTime = millis();
-        Serial.println("ArduinoTime,CH0,CH1,Lux,Irradiance[W/m2],Error[W/m2],Temperature[C]");
-      } else {
-        // extract the measurement interval from the command
-        int seconds = command.substring(separatorPos + 1).toInt();
+    // single measurement
+    if (command.equalsIgnoreCase("log")) {
+      printMeasurement(ch0, ch1, lux, irrad, error, temp);
+    } 
+    
+    // set interval
+    else if (command.startsWith("every")) {
+      int16_t separatorPos = command.indexOf(' ');
+      if (separatorPos != -1) {
+        uint32_t seconds = strtoul(command.substring(separatorPos + 1).c_str(), nullptr, 10);
         if (seconds > 0) {
-          Serial.print("Start continuous logging every ");
-          Serial.print(seconds);
-          Serial.println(" s");
-          continuousMode = true;
           logInterval = seconds * 1000;
-          Serial.println("\nArduinoTime,CH0,CH1,Lux,Irradiance[W/m2],Error[W/m2],Temperature[C]");
-        } else {
-          Serial.println("Command not recognized!");
+          // turn on logging mode if it was off
+          if (!logging) {
+            logging = true;
+            logStartTime = millis();
+          }
+          printSettings();
         }
       }
-    }
-
-    if (command.equalsIgnoreCase("stop")) {
+    } 
+    
+    // set timeout
+    else if (command.startsWith("timeout")) {
+      int16_t separatorPos = command.indexOf(' ');
+      if (separatorPos != -1) {
+        uint32_t seconds = strtoul(command.substring(separatorPos + 1).c_str(), nullptr, 10);
+        if (seconds > 0) {
+          logTimeout = seconds * 1000;
+          logging = true;
+          logStartTime = millis();
+          printSettings();
+        }
+      }
+    } 
+    
+    // stop measurements
+    else if (command.equalsIgnoreCase("stop")) {
       logging = false;
-      continuousMode = false;
-      Serial.println("Logging stopped.");
+      hasHeader = false;
       Serial.println();
-    }
-      
+    } 
+    
+    // show help
+    else if (command.equalsIgnoreCase("help") || command.equalsIgnoreCase("h")) {
+      printHelp();
+    }   
   }
 
-  // print data in CSV format
+  // check for logging conditions
   if (logging) {
-    Serial.print(millis()); Serial.print(","); // timestamp
-    Serial.print(ch0); Serial.print(","); // channel 0 (full spectrum)
-    Serial.print(ch1); Serial.print(","); // channel 1 (IR)
-    Serial.print(lux); Serial.print(",");
-    Serial.print(irrad); Serial.print(",");
-    Serial.print(error); Serial.print(",");
-    Serial.println(temp);
+    if (millis() - lastLog >= logInterval) {
+      printMeasurement(ch0, ch1, lux, irrad, error, temp);
+    }
 
-    // stop logging after specified time
-    if (millis() - logStartTime >= LOG_DURATION) {
+    // stop logging after specified timeout
+    if ((logTimeout != 0) && (millis() - logStartTime >= logTimeout)) {
       logging = false;
-      Serial.println("Logging stopped.");
+      hasHeader = false;
       Serial.println();
     }
   }
-
-  if (continuousMode && (millis() - lastLog) >= logInterval) {
-    Serial.print(millis()); Serial.print(","); // timestamp
-    Serial.print(ch0); Serial.print(","); // channel 0 (full spectrum)
-    Serial.print(ch1); Serial.print(","); // channel 1 (IR)
-    Serial.print(lux); Serial.print(",");
-    Serial.print(irrad); Serial.print(",");
-    Serial.print(error); Serial.print(",");
-    Serial.println(temp);
-
-    lastLog = millis();
-  }
-
-  delay(500);
 }
